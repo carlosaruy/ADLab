@@ -10,11 +10,14 @@ windows:
     ansible_user: vagrant
     ansible_password: vagrant
     ansible_winrm_transport: ntlm
-    # --- LA LÍNEA CLAVE ---
     # Especificamos que la conexión es por HTTP (no cifrado)
     ansible_winrm_scheme: http
     # Le decimos a Ansible que nuestro método es inseguro pero está bien
     ansible_winrm_server_cert_validation: ignore
+    # y dado que va a ir por el puerto 5986, le indico que vaya al 5985...
+    ansible_port: 5985
+    domain_name: adlab.local
+    domain_safe_mode_password: P@ssw0rd123! 
   children:
     dc:
       hosts:
