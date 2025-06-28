@@ -1,5 +1,20 @@
 ---
 windows:
+  hosts:
+    10.13.37.10:
+    10.13.37.100:
+    10.13.37.150:
+  vars:
+    # Variables de conexión para todo el grupo [windows]
+    ansible_connection: winrm
+    ansible_user: vagrant
+    ansible_password: vagrant
+    ansible_winrm_transport: ntlm
+    # --- LA LÍNEA CLAVE ---
+    # Especificamos que la conexión es por HTTP (no cifrado)
+    ansible_winrm_scheme: http
+    # Le decimos a Ansible que nuestro método es inseguro pero está bien
+    ansible_winrm_server_cert_validation: ignore
   children:
     dc:
       hosts:
