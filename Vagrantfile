@@ -79,7 +79,10 @@ Vagrant.configure("2") do |config|
       v.cpus   = 2
     end
 
-    # Sin reload automático para evitar perder la configuración de red
+    win10.vm.provision "reload"
+    win10.vn.provision "shell", type: "powershell", inline: "Get-NetConnectionProfile"
+    win10.vn.provision "shell", type: "powershell", inline: "Set-NetConnectionProfile -name \"Unidentified network\" -NetworkCategory Private"
+    win10.vn.provision "shell", type: "powershell", inline: "Set-NetConnectionProfile -name \"network\" -NetworkCategory Private"
     win10.vm.provision "shell", inline: "winrm quickconfig -q"
   end
 
@@ -87,35 +90,42 @@ Vagrant.configure("2") do |config|
   # Orquestador Debian       #
   ############################
 
+  # Maquina atacante/orquestador
   config.vm.define "orchestrator" do |orc|
-    orc.vm.box      = "debian/buster64"
+    orc.vm.box = "debian/buster64"
     orc.vm.hostname = "orchestrator"
     orc.vm.network "private_network",
                    ip: "10.13.37.5",
                    netmask: "255.255.255.0"
 
-    # Monta el proyecto completo para playbooks, scripts, etc.
-    orc.vm.synced_folder ".", "/vagrant", disabled: false
+    orc.vm.provider "virtualbox" do |vb|
+      vb.name = "ADLab_orchestrator"
+      vb.gui = false
+      vb.cpus = 2
+      vb.memory = 2048
+    end
 
-    # Aprovisionamiento: instala Ansible y dependencias para gestionar WinRM
-    orc.vm.provision "shell", inline: <<-SHELL
-      set -e
-      echo "[orchestrator] Actualizando mirrors y paquetes …"
-      cat > /etc/apt/sources.list <<EOF
-      deb https://deb.debian.org/debian buster main
-      deb https://security.debian.org/debian-security buster/updates main
-      deb https://deb.debian.org/debian buster-updates main
-      EOF
-      apt-get update -y
-      apt-get install -y python3-pip git sshpass
-      pip3 install --upgrade ansible 'pywinrm>=0.3.0'
-    SHELL
-
-    # Ejecuta playbooks cada vez que arranca la VM
-    orc.vm.provision "shell", run: "always", inline: <<-SHELL
-      echo "[orchestrator] Ejecutando playbook de Ansible…"
-      cd /vagrant/Ansible
-      ansible-playbook -i inventory.yml cloudlabs.yml || true
+    # Aprovisionamiento
+    orc.vm.provision "shell", privileged: true, inline: <<-SHELL
+        echo "[orchestrator] Configurando repositorios de APT..."
+        # 'EOF' en este "here document" anidado.
+        cat > /etc/apt/sources.list <<'EOF'
+deb https://deb.debian.org/debian buster main
+deb https://security.debian.org/debian-security buster/updates main
+deb https://deb.debian.org/debian buster-updates main
+EOF
+        
+        echo "[orchestrator] Actualizando e instalando dependencias..."
+        apt-get update -y
+        apt-get install -y python3-pip git sshpass
+		
+        echo "[orchestrator] Instalando Ansible y PyWinRM via Pip..."
+        pip3 install --upgrade ansible 'pywinrm>=0.3.0'		
+		
+        echo "[orchestrator] Ejecutando playbook de Ansible como usuario vagrant..."
+        # Ejecutamos el playbook como el usuario 'vagrant' para que tenga
+        # acceso al directorio compartido /vagrant
+        sudo -u vagrant bash -c 'cd /vagrant/Ansible && ansible-playbook cloudlabs.yml'
     SHELL
   end
 end
